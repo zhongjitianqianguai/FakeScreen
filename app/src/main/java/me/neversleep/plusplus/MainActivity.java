@@ -1,17 +1,10 @@
 package me.neversleep.plusplus;
 
-import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.service.quicksettings.TileService;
 import android.view.View;
 import android.widget.CheckBox;
 import android.widget.TextView;
@@ -19,129 +12,125 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
-import androidx.core.internal.view.SupportMenu;
-import androidx.core.view.InputDeviceCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
-    private SharedPreferences xConf;
+    private SwitchCompat power;
+    private CheckBox disableSleep;
+    private boolean rendering;
+    private final Runnable stateListener = this::render;
 
+    /** Only the legacy build self-hooks this method. */
     public static int getActiveVersion() {
         return 0;
     }
 
+    @Override
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         setContentView(R.layout.activity_main);
-        main();
-    }
+        View root = findViewById(R.id.root);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars()
+                    | WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(root);
+        power = findViewById(R.id.power);
+        disableSleep = findViewById(R.id.disable_sleep);
+        power.setOnCheckedChangeListener((button, checked) -> changeSetting("power", checked));
+        disableSleep.setOnCheckedChangeListener((button, checked) -> changeSetting("disable_sleep", checked));
 
-    private void checkEdXposed() {
-        try {
-            this.xConf = getSharedPreferences("x_conf", MODE_WORLD_READABLE);
-        } catch (SecurityException unused) {
-            new AlertDialog.Builder(this).setMessage(getString(R.string.not_supported)).setPositiveButton(android.R.string.ok, (dialogInterface, i) -> finish()).setNegativeButton(R.string.ignore, null).show();
-        }
-    }
-
-    public void onRequestPermissionsResult(int i, String[] strArr, int[] iArr) {
-        super.onRequestPermissionsResult(i, strArr, iArr);
-        if (i != 10002 || iArr.length <= 0) {
-            return;
-        }
-        if (iArr[0] == 0) {
-            main();
-        } else {
-            Toast.makeText(this, getString(R.string.auth_failed), Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void onResume() {
-        super.onResume();
-        main();
-    }
-
-    @SuppressLint("RestrictedApi")
-    protected void main() {
-        TextView textView = findViewById(R.id.tips);
-        TextView textView2 = findViewById(R.id.shell_control);
         TextView info = findViewById(R.id.info);
-        CheckBox disableSleep = findViewById(R.id.disable_sleep);
-        SwitchCompat switchCompat = findViewById(R.id.power);
-        info.setOnClickListener(view -> {
-            Uri uri = Uri.parse("https://github.com/jitcor");
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            startActivity(intent);
+        info.setText(String.format(Locale.ROOT, "v%s (%s) | jitcor",
+                BuildConfig.VERSION_NAME, BuildConfig.FLAVOR));
+        info.setOnClickListener(view -> startActivity(new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://github.com/jitcor"))));
+        String command = "am start -n " + BuildConfig.APPLICATION_ID + "/"
+                + MainActivity.class.getName() + " --ez power true/false";
+        TextView shell = findViewById(R.id.shell_control);
+        shell.setText(getString(R.string.shell_control, command));
+        shell.setOnLongClickListener(view -> {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard == null) return false;
+            clipboard.setPrimaryClip(ClipData.newPlainText("FakeScreen", command));
+            Toast.makeText(this, R.string.copy_success, Toast.LENGTH_SHORT).show();
+            return true;
         });
-        if (xConf != null) {
-            disableSleep.setChecked(xConf.getBoolean("disable_sleep", false));
-        }
-        disableSleep.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if (xConf != null) {
-                boolean old = xConf.getBoolean("disable_sleep", false);
-                if (old != isChecked) {
-                    if (!xConf.edit().putBoolean("disable_sleep", isChecked).commit()) {
-                        Toast.makeText(MainActivity.this, R.string.disable_sleep_error_tips, Toast.LENGTH_SHORT).show();
-                    }
-                }
-            } else {
-                Toast.makeText(this, "error: xConf is null!", Toast.LENGTH_SHORT).show();
-            }
-        });
-        info.setText(String.format("v%s | jitcor", BuildConfig.VERSION_NAME));
-        String command = "am start -n me.neversleep.plusplus/.MainActivity --ez power true/false";
-        textView2.setText(String.format(getString(R.string.shell_control), command));
-        textView2.setOnLongClickListener(view -> {
-            ClipboardManager clipboardManager = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboardManager != null) {
-                clipboardManager.setPrimaryClip(ClipData.newPlainText(null, command));
-                Toast.makeText(MainActivity.this, getString(R.string.copy_success), Toast.LENGTH_LONG).show();
-                return true;
-            }
-            Toast.makeText(MainActivity.this, getString(R.string.copy_failed), Toast.LENGTH_LONG).show();
-            return false;
-
-        });
-        if (getActiveVersion() == 0) {
-            textView.setVisibility(View.VISIBLE);
-            textView.setText(R.string.active_tips);
-            textView.setTextColor(SupportMenu.CATEGORY_MASK);
-        } else if (BuildConfig.VERSION_CODE == getActiveVersion()) {
-            textView.setVisibility(View.INVISIBLE);
-        } else {
-            textView.setVisibility(View.VISIBLE);
-            textView.setText(String.format(getString(R.string.active_warn), getActiveVersion(), BuildConfig.VERSION_CODE));
-            textView.setTextColor(InputDeviceCompat.SOURCE_ANY);
-        }
-        switchCompat.setOnCheckedChangeListener((compoundButton, z) -> {
-            SharedPreferences sharedPreferences = MainActivity.this.xConf;
-            if (sharedPreferences != null) {
-                if (!sharedPreferences.edit().putBoolean("power", z).commit()) {
-                    Toast.makeText(MainActivity.this, getString(R.string.failed_tips), Toast.LENGTH_LONG).show();
-                }
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    TileService.requestListeningState(MainActivity.this, new ComponentName(BuildConfig.APPLICATION_ID, QuickStartService.class.getName()));
-                }
-            }
-
-        });
-        checkEdXposed();
-        if (this.xConf == null) {
-            Toast.makeText(this, "error: xConf is null!", Toast.LENGTH_LONG).show();
-        } else if (getIntent().hasExtra("power")) {
-            if (!this.xConf.edit().putBoolean("power", getIntent().getBooleanExtra("power", false)).commit()) {
-                Toast.makeText(this, "error: change power failed", Toast.LENGTH_LONG).show();
-            } else {
-                Toast.makeText(this, "success", Toast.LENGTH_LONG).show();
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                TileService.requestListeningState(this, new ComponentName(BuildConfig.APPLICATION_ID, QuickStartService.class.getName()));
-            }
-            finish();
-        } else {
-            switchCompat.setChecked(this.xConf.getBoolean("power", false));
-        }
-
+        render();
+        handleCommand(getIntent());
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        AppSettings.addListener(stateListener);
+    }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        ModuleConnection.sync(this);
+        render();
+    }
+
+    @Override
+    protected void onStop() {
+        AppSettings.removeListener(stateListener);
+        super.onStop();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (BuildConfig.DEBUG) android.util.Log.d("FakeScreen", "New command: power extra="
+                + intent.hasExtra("power"));
+        setIntent(intent);
+        handleCommand(intent);
+    }
+
+    private void handleCommand(Intent intent) {
+        if (!intent.hasExtra("power")) return;
+        boolean enabled = intent.getBooleanExtra("power", false);
+        intent.removeExtra("power");
+        boolean saved = AppSettings.set(this, "power", enabled);
+        Toast.makeText(this, saved ? (ModuleConnection.isPending()
+                        ? R.string.settings_pending : R.string.settings_saved) : R.string.failed_tips,
+                Toast.LENGTH_LONG).show();
+        finish();
+    }
+
+    private void changeSetting(String key, boolean checked) {
+        if (rendering) return;
+        if (!AppSettings.set(this, key, checked)) {
+            Toast.makeText(this, R.string.failed_tips, Toast.LENGTH_LONG).show();
+        } else if (ModuleConnection.isPending()) {
+            Toast.makeText(this, R.string.settings_pending, Toast.LENGTH_LONG).show();
+        }
+        render();
+    }
+
+    private void render() {
+        rendering = true;
+        power.setChecked(AppSettings.enabled(this, "power"));
+        disableSleep.setChecked(AppSettings.enabled(this, "disable_sleep"));
+        rendering = false;
+        TextView tips = findViewById(R.id.tips);
+        long active = ModuleConnection.activeVersion();
+        tips.setVisibility(View.VISIBLE);
+        if (active == 0) {
+            tips.setText(R.string.active_tips);
+        } else if (active != BuildConfig.VERSION_CODE) {
+            tips.setText(getString(R.string.active_warn, active, BuildConfig.VERSION_CODE));
+        } else if (ModuleConnection.isPending()) {
+            tips.setText(R.string.settings_pending);
+        } else {
+            tips.setVisibility(View.GONE);
+        }
+    }
 }

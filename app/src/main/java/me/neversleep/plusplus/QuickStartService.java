@@ -1,65 +1,57 @@
 package me.neversleep.plusplus;
 
 import android.annotation.TargetApi;
-import android.content.SharedPreferences;
 import android.os.Build;
+import android.service.quicksettings.Tile;
 import android.service.quicksettings.TileService;
-import android.util.Log;
 import android.widget.Toast;
 
 @TargetApi(Build.VERSION_CODES.N)
 public class QuickStartService extends TileService {
-    public static final String TAG = "QurkStartService";
-    private SharedPreferences xConf;
+    private final Runnable stateListener = this::updateTile;
 
-    @Override // android.app.Service
-    public void onCreate() {
-        super.onCreate();
-        try {
-            this.xConf = getSharedPreferences("x_conf", 1);
-            Log.e(TAG, "onCreate: xConf" + this.xConf);
-        } catch (SecurityException e) {
-            Toast.makeText(this, "error: " + e.getMessage(), 1).show();
-        }
-    }
-
-    @Override // android.service.quicksettings.TileService
+    @Override
     public void onClick() {
         super.onClick();
-        if (this.xConf == null) {
-            return;
+        boolean enabled = !AppSettings.enabled(this, "power");
+        if (!AppSettings.set(this, "power", enabled)) {
+            Toast.makeText(this, R.string.failed_tips, Toast.LENGTH_LONG).show();
+        } else if (ModuleConnection.isPending()) {
+            Toast.makeText(this, R.string.settings_pending, Toast.LENGTH_LONG).show();
         }
-        int state = getQsTile().getState();
-        if (state == 1) {
-            getQsTile().setState(2);
-            this.xConf.edit().putBoolean("power", true).apply();
-        } else if (state == 2) {
-            getQsTile().setState(1);
-            this.xConf.edit().putBoolean("power", false).apply();
-        }
-        getQsTile().updateTile();
-        Log.e(TAG, "onClick: " + getQsTile().getState());
+        updateTile();
     }
 
-    @Override // android.service.quicksettings.TileService
+    @Override
     public void onTileAdded() {
         super.onTileAdded();
-        if (this.xConf == null) {
-            return;
-        }
-        getQsTile().setState(this.xConf.getBoolean("power", false) ? 2 : 1);
-        getQsTile().updateTile();
-        Log.e(TAG, "onTileAdded: " + this.xConf.getBoolean("power", false) + ":" + getQsTile().getState());
+        updateTile();
     }
 
-    @Override // android.service.quicksettings.TileService
+    @Override
     public void onStartListening() {
         super.onStartListening();
-        if (this.xConf == null) {
-            return;
-        }
-        getQsTile().setState(this.xConf.getBoolean("power", false) ? 2 : 1);
-        getQsTile().updateTile();
-        Log.e(TAG, "onStartListening: update" + this.xConf.getBoolean("power", false) + ":" + getQsTile().getState());
+        AppSettings.addListener(stateListener);
+        ModuleConnection.sync(this);
+        updateTile();
+    }
+
+    @Override
+    public void onStopListening() {
+        AppSettings.removeListener(stateListener);
+        super.onStopListening();
+    }
+
+    @Override
+    public void onDestroy() {
+        AppSettings.removeListener(stateListener);
+        super.onDestroy();
+    }
+
+    private void updateTile() {
+        Tile tile = getQsTile();
+        if (tile == null) return;
+        tile.setState(AppSettings.enabled(this, "power") ? Tile.STATE_ACTIVE : Tile.STATE_INACTIVE);
+        tile.updateTile();
     }
 }

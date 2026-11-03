@@ -4,8 +4,11 @@
     <string name="use_desc">After it is turned on, clicking the power button will only turn off the screen, and other states will remain unchanged.</string>
     <string name="shell_control">Shell control commands: %s</string>
     <string name="ignore">Ignore</string>
-    <string name="active_tips">Please activate the module first! !</string>
-    <string name="active_warn">Current activated version: %d, non-installed version: %d</string>
+    <string name="active_tips">Enable FakeScreen in LSPosed, select System Framework, then reboot. The modern build requires API 102.</string>
+    <string name="active_warn">Loaded version: %1$d; installed version: %2$d. Reboot to load the update.</string>
+    <string name="power_label">Fake screen off</string>
+    <string name="settings_saved">Settings saved</string>
+    <string name="settings_pending">Saved on this device. Waiting to sync with LSPosed; open the app again after activating the module.</string>
     <string name="not_supported">It seems that you are using an out dated version of LSPosed or LSPosed is not activated, please update LSPosed or try again after activated.</string>
     <string name="auth_failed">Authorization failed</string>
     <string name="copy_failed">copy failed</string>

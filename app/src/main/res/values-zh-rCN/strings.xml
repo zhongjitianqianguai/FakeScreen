@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="active_tips">请先激活模块！！</string>
-    <string name="active_warn">当前激活版本：%d,非已安装版本：%d</string>
+    <string name="active_tips">请在 LSPosed 启用 FakeScreen，勾选系统框架后重启。modern 版需要 API 102。</string>
+    <string name="active_warn">当前加载版本：%1$d；已安装版本：%2$d。请重启以加载更新。</string>
+    <string name="power_label">假息屏</string>
+    <string name="settings_saved">设置已保存</string>
+    <string name="settings_pending">设置已保存在本机，等待同步到 LSPosed。启用模块后请重新打开应用。</string>
     <string name="app_name">FakeScreen</string>
     <string name="auth_failed">授权失败</string>
     <string name="copy_failed">复制失败</string>

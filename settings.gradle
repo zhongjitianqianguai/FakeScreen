@@ -8,14 +8,12 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven {
-            url 'https://jitpack.io'
-        }
         google()
-        jcenter()
         mavenCentral()
-        maven { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
-        maven { url "https://oss.jfrog.org/libs-snapshot" }
+        maven {
+            url = 'https://api.xposed.info/'
+            content { includeGroup 'de.robv.android.xposed' }
+        }
     }
 }
 
