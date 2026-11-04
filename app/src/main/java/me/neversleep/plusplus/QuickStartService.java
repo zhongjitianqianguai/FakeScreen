@@ -15,7 +15,8 @@ public class QuickStartService extends TileService {
         super.onClick();
         boolean enabled = !AppSettings.enabled(this, "power");
         if (!AppSettings.set(this, "power", enabled)) {
-            Toast.makeText(this, R.string.failed_tips, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, SettingsMigration.hasLegacyConflict()
+                    ? R.string.migration_resolution_required : R.string.failed_tips, Toast.LENGTH_LONG).show();
         } else if (ModuleConnection.isPending()) {
             Toast.makeText(this, R.string.settings_pending, Toast.LENGTH_LONG).show();
         }

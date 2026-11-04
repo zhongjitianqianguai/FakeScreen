@@ -16,7 +16,14 @@
     <string name="describe">Never sleep but don\'t want the screen to be on</string>
     <string name="failed_tips">Failed</string>
     <string name="disable_sleep">Disable sleep</string>
-    <string name="disable_sleep_desc">Optional, phone will never sleeps</string>
+    <string name="disable_sleep_desc">Prevent automatic timeout sleep. Power-button and fold actions follow their own settings.</string>
     <string name="disable_sleep_error_tips">Failed to change settings</string>
+    <string name="migration_conflict_title">Choose legacy settings</string>
+    <string name="migration_conflict_message">The saved legacy settings and current settings differ, and their order cannot be determined. Both copies will be kept until you choose.\n\nSaved: Fake screen off %1$s; Disable sleep %2$s\nCurrent: Fake screen off %3$s; Disable sleep %4$s</string>
+    <string name="migration_use_snapshot">Use saved settings</string>
+    <string name="migration_keep_current">Keep current settings</string>
+    <string name="migration_resolution_required">Choose which legacy settings to keep in the settings page, then retry.</string>
+    <string name="setting_on">on</string>
+    <string name="setting_off">off</string>
 
 </resources>

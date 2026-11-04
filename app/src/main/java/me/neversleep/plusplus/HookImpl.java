@@ -23,7 +23,17 @@ final class HookImpl {
     private final ScreenPowerController screen;
 
     HookImpl(ClassLoader loader, Settings settings, Logger logger) {
-        this(settings, logger, mode -> setDisplayPowerMode(loader, mode));
+        this(settings, logger, new ScreenPowerController.Display() {
+            @Override
+            public Object currentToken() throws ReflectiveOperationException {
+                return currentDisplayToken(loader);
+            }
+
+            @Override
+            public boolean setPowerMode(Object token, int mode) throws ReflectiveOperationException {
+                return setDisplayPowerMode(loader, (IBinder) token, mode);
+            }
+        });
     }
 
     HookImpl(Settings settings, Logger logger, ScreenPowerController.Display display) {
@@ -34,12 +44,28 @@ final class HookImpl {
 
     boolean onPowerPress() {
         try {
-            if (settings.enabled("power")) return screen.toggle();
-            screen.restore();
+            return screen.toggleIfEnabled(() -> settings.enabled("power"));
         } catch (ReflectiveOperationException | RuntimeException e) {
             logger.error("Display control failed; leaving the power key to Android", e);
         }
         return false;
+    }
+
+    boolean onPowerPress(Object policy, Method method, Object[] arguments) {
+        try {
+            return PowerKeyPolicy.shouldHandle(policy, method, arguments) && onPowerPress();
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            logger.error("Could not read power-key state; leaving this press to Android", e);
+            return false;
+        }
+    }
+
+    boolean beginDisplayChange(Object token) {
+        return screen.beginDisplayChange(token);
+    }
+
+    void endDisplayChange(boolean succeeded) {
+        screen.endDisplayChange(succeeded);
     }
 
     boolean keepAwake() {
@@ -52,7 +78,7 @@ final class HookImpl {
 
     void onConfigurationChanged() {
         try {
-            if (!settings.enabled("power")) screen.restore();
+            screen.restoreIfDisabled(() -> settings.enabled("power"));
         } catch (ReflectiveOperationException | RuntimeException e) {
             logger.error("Could not restore display after disabling FakeScreen", e);
         }
@@ -72,6 +98,26 @@ final class HookImpl {
         return result;
     }
 
+    /** Known direct/transitive callers of the automatic-sleep predicates, across API 31+. */
+    static List<Method> findSleepPolicyCallers(Class<?> powerService) {
+        List<Method> result = new ArrayList<>();
+        for (Method method : powerService.getDeclaredMethods()) {
+            switch (method.getName()) {
+                case "isItBedTimeYetLocked":
+                case "updateWakefulnessLocked":
+                case "handleSandman":
+                case "onDreamSuppressionChangedLocked":
+                case "updateAttentiveStateLocked":
+                case "maybeHideInattentiveSleepWarningLocked":
+                    result.add(method);
+                    break;
+                default:
+                    break;
+            }
+        }
+        return result;
+    }
+
     static Method findMethod(ClassLoader loader, String className, String methodName,
                              Class<?> returnType, Class<?>... parameterTypes)
             throws ClassNotFoundException, NoSuchMethodException {
@@ -86,23 +132,29 @@ final class HookImpl {
     // Called exclusively by hooks inside system_server, where platform hidden APIs are available.
     // These interfaces are the feature itself; the app process never invokes this method.
     @SuppressLint({"BlockedPrivateApi", "SoonBlockedPrivateApi"})
-    private static boolean setDisplayPowerMode(ClassLoader loader, int mode)
+    private static IBinder currentDisplayToken(ClassLoader loader)
             throws ReflectiveOperationException {
-        Class<?> surface = Class.forName("android.view.SurfaceControl", false, loader);
-        IBinder token;
-        if (Build.VERSION.SDK_INT < 29) {
-            token = (IBinder) surface.getDeclaredMethod("getBuiltInDisplay", int.class)
-                    .invoke(null, 0);
-        } else if (Build.VERSION.SDK_INT < 34) {
-            token = (IBinder) surface.getDeclaredMethod("getInternalDisplayToken").invoke(null);
-        } else {
-            Class<?> control = Class.forName("com.android.server.display.DisplayControl", false, loader);
-            long[] ids = (long[]) control.getDeclaredMethod("getPhysicalDisplayIds").invoke(null);
-            if (ids == null || ids.length == 0) return false;
-            token = (IBinder) control.getDeclaredMethod("getPhysicalDisplayToken", long.class)
-                    .invoke(null, ids[0]);
-        }
+        Class<?> control = Class.forName(Build.VERSION.SDK_INT < 34
+                ? "android.view.SurfaceControl" : "com.android.server.display.DisplayControl", false, loader);
+        // SurfaceFlinger's first ID can change when one of two lit panels is switched off.
+        // Resolve the logical default display instead, so subsequent cycles still control
+        // the panel containing the default display's content after native active-display changes.
+        Class<?> globalType = Class.forName("android.hardware.display.DisplayManagerGlobal", false, loader);
+        Object global = globalType.getMethod("getInstance").invoke(null);
+        Object info = globalType.getMethod("getDisplayInfo", int.class).invoke(global, 0);
+        if (info == null) return null;
+        String uniqueId = (String) info.getClass().getField("uniqueId").get(info);
+        if (uniqueId == null || !uniqueId.startsWith("local:")) return null;
+        long physicalId = Long.parseLong(uniqueId.substring("local:".length()));
+        return (IBinder) control.getDeclaredMethod("getPhysicalDisplayToken", long.class)
+                .invoke(null, physicalId);
+    }
+
+    @SuppressLint({"BlockedPrivateApi", "SoonBlockedPrivateApi"})
+    private static boolean setDisplayPowerMode(ClassLoader loader, IBinder token, int mode)
+            throws ReflectiveOperationException {
         if (token == null) return false;
+        Class<?> surface = Class.forName("android.view.SurfaceControl", false, loader);
         surface.getDeclaredMethod("setDisplayPowerMode", IBinder.class, int.class)
                 .invoke(null, token, mode);
         return true;

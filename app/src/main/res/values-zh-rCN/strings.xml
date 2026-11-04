@@ -17,6 +17,13 @@
     <string name="tile_label">@string/app_name</string>
     <string name="use_desc">开启后，点击电源键将只息屏，其他状态不变</string>
     <string name="disable_sleep">禁用休眠</string>
-    <string name="disable_sleep_desc">可选功能，手机将永不休眠</string>
+    <string name="disable_sleep_desc">阻止自动超时休眠；电源键和折叠等操作仍按各自设置执行</string>
     <string name="disable_sleep_error_tips">更改设置失败</string>
+    <string name="migration_conflict_title">选择保留的旧设置</string>
+    <string name="migration_conflict_message">旧版保存的设置与当前设置不同，且无法判断哪份较新。选择前会保留两份数据。\n\n旧版记录：假息屏%1$s；禁用休眠%2$s\n当前设置：假息屏%3$s；禁用休眠%4$s</string>
+    <string name="migration_use_snapshot">使用旧版记录</string>
+    <string name="migration_keep_current">保留当前设置</string>
+    <string name="migration_resolution_required">请先在设置页选择保留哪份旧设置，然后重试。</string>
+    <string name="setting_on">开启</string>
+    <string name="setting_off">关闭</string>
 </resources>

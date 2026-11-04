@@ -7,17 +7,18 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
+import static me.neversleep.plusplus.TestDisplays.modes;
 
 public class HookBehaviorTest {
     @Test
     public void displayFailureReturnsControlToAndroidAndCanBeRetried() {
         List<Integer> modes = new ArrayList<>();
         List<Throwable> errors = new ArrayList<>();
-        HookImpl hooks = new HookImpl(key -> true, (message, error) -> errors.add(error), mode -> {
+        HookImpl hooks = new HookImpl(key -> true, (message, error) -> errors.add(error), modes(mode -> {
             modes.add(mode);
             if (modes.size() == 1) throw new ReflectiveOperationException("no display");
             return true;
-        });
+        }));
         assertFalse(hooks.onPowerPress());
         assertEquals(1, errors.size());
         assertTrue(hooks.onPowerPress());
@@ -26,7 +27,7 @@ public class HookBehaviorTest {
 
     @Test
     public void missingTokenDoesNotConsumePowerKey() {
-        HookImpl hooks = new HookImpl(key -> true, (message, error) -> fail(message), mode -> false);
+        HookImpl hooks = new HookImpl(key -> true, (message, error) -> fail(message), modes(mode -> false));
         assertFalse(hooks.onPowerPress());
     }
 
@@ -35,7 +36,7 @@ public class HookBehaviorTest {
         boolean[] enabled = {true};
         List<Integer> modes = new ArrayList<>();
         HookImpl hooks = new HookImpl(key -> enabled[0],
-                (message, error) -> fail(message), mode -> modes.add(mode));
+                (message, error) -> fail(message), modes(mode -> modes.add(mode)));
         assertTrue(hooks.onPowerPress());
         enabled[0] = false;
         hooks.onConfigurationChanged();
@@ -46,7 +47,7 @@ public class HookBehaviorTest {
     @Test
     public void disableSleepRemainsIndependentOfPowerToggle() {
         HookImpl hooks = new HookImpl(key -> "disable_sleep".equals(key),
-                (message, error) -> fail(message), mode -> { fail("Unexpected display operation"); return false; });
+                (message, error) -> fail(message), modes(mode -> { fail("Unexpected display operation"); return false; }));
         assertTrue(hooks.keepAwake());
         assertFalse(hooks.onPowerPress());
     }
@@ -54,7 +55,7 @@ public class HookBehaviorTest {
     @Test
     public void disableSleepSuppressesTouchDimmingRequest() {
         HookImpl hooks = new HookImpl(key -> "disable_sleep".equals(key),
-                (message, error) -> fail(message), mode -> true);
+                (message, error) -> fail(message), modes(mode -> true));
         assertFalse(hooks.adjustTouchDimming(true));
         assertFalse(hooks.adjustTouchDimming(false));
     }
@@ -62,7 +63,7 @@ public class HookBehaviorTest {
     @Test
     public void touchDimmingPassesThroughWhenDisableSleepIsOff() {
         HookImpl hooks = new HookImpl(key -> false,
-                (message, error) -> fail(message), mode -> true);
+                (message, error) -> fail(message), modes(mode -> true));
         assertTrue(hooks.adjustTouchDimming(true));
         assertFalse(hooks.adjustTouchDimming(false));
     }
@@ -70,7 +71,7 @@ public class HookBehaviorTest {
     @Test
     public void powerToggleSettingDoesNotSuppressTouchDimming() {
         HookImpl hooks = new HookImpl(key -> "power".equals(key),
-                (message, error) -> fail(message), mode -> true);
+                (message, error) -> fail(message), modes(mode -> true));
         assertTrue(hooks.adjustTouchDimming(true));
         assertFalse(hooks.adjustTouchDimming(false));
     }
